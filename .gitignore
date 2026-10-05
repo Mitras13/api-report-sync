@@ -1,0 +1,12 @@
+.env
+data/*.db
+tokens/*.txt
+tokens/tokens/
+logs/*.log*
+raw_data/
+__pycache__/
+*.pyc
+.claude/
+.main_download.lock
+_*_tmp.py
+_*_tmp.txt
