@@ -9,6 +9,17 @@ data table also carries a `_SourceFile` column, and any rows previously
 loaded from a given file are deleted before that file is re-inserted, so a
 retried or interrupted run can never leave duplicate rows behind.
 
+Re-downloaded files: file names are
+`<CO>_<REPORT>_<start:14>_<end:14>_<downloaded-at:14>.parquet`. When the same
+(start, end) range is downloaded again, the new file has a different name, so
+it used to be loaded *in addition to* the old one (e.g. 37 days of SaleR_54
+counted twice). Now loading a newer download of a range first deletes the
+rows of every older download of that range (same transaction), and an older
+download that shows up after a newer one is skipped. Superseded files stay in
+`dbo.LoadedFiles` with [RowCount] = 0 so they are never loaded again. Two
+different ranges of the same day (e.g. 00:00-12:31 and 12:31-23:59) are not
+duplicates and are both kept.
+
 Column names come straight from the source data (Persian headers included).
 Table schemas are created from the first file seen for that table and are
 widened automatically (BIGINT -> FLOAT -> NVARCHAR(MAX)) if a later file
@@ -17,6 +28,7 @@ needs a wider type for an existing column, or a brand-new column appears.
 
 import logging
 import math
+import re
 
 import pandas as pd
 import pyodbc
@@ -127,6 +139,66 @@ def unmark_file_loaded(conn: pyodbc.Connection, relative_path: str) -> None:
         relative_path,
     )
     conn.commit()
+
+
+_RANGE_RE = re.compile(r"^(?P<range>.+_\d{14}_\d{14})_(?P<downloaded>\d{14})\.parquet$")
+
+
+def split_range(relative_path: str):
+    """'SaleR/54/54_SaleR_14050330000000_14050330235959_14050618113206.parquet'
+    -> ('SaleR/54/54_SaleR_14050330000000_14050330235959', '14050618113206');
+    (None, None) for names without that pattern (never treated as duplicates)."""
+    m = _RANGE_RE.match(relative_path)
+    return (m["range"], m["downloaded"]) if m else (None, None)
+
+
+def _like_escape(text: str) -> str:
+    """Literal text for LIKE ... ESCAPE '!' (file names contain '_', a LIKE wildcard)."""
+    return text.replace("!", "!!").replace("%", "!%").replace("_", "!_").replace("[", "![")
+
+
+def loaded_versions(conn: pyodbc.Connection, table_name: str, relative_path: str) -> list:
+    """Other loaded files of the same table with the same (start, end) range:
+    [(relative_path, downloaded_at, row_count)]."""
+    rng, _ = split_range(relative_path)
+    if rng is None:
+        return []
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT RelativePath, [RowCount] FROM dbo.{quote_ident(TRACKING_TABLE)} "
+        "WHERE TableName = ? AND RelativePath LIKE ? ESCAPE '!'",
+        table_name,
+        _like_escape(rng) + "!_%",
+    )
+    out = []
+    for path, row_count in cur.fetchall():
+        other_rng, downloaded = split_range(path)
+        if other_rng == rng and path != relative_path:
+            out.append((path, downloaded, row_count))
+    return out
+
+
+def newer_version_loaded(conn: pyodbc.Connection, table_name: str, relative_path: str):
+    """Path of an already-loaded *newer* download of the same range, or None."""
+    _, downloaded = split_range(relative_path)
+    newer = [p for p, d, _ in loaded_versions(conn, table_name, relative_path) if d > downloaded]
+    return max(newer) if newer else None
+
+
+def supersede_older_versions(conn: pyodbc.Connection, table_name: str, relative_path: str) -> list:
+    """Delete the rows of every older download of this file's range and set
+    their LoadedFiles [RowCount] to 0 (kept, so they are never reloaded).
+    Does not commit: runs in the same transaction as the new file's insert."""
+    _, downloaded = split_range(relative_path)
+    older = [p for p, d, n in loaded_versions(conn, table_name, relative_path) if d < downloaded and n != 0]
+    cur = conn.cursor()
+    for path in older:
+        delete_rows_for_file(conn, table_name, path)
+        cur.execute(
+            f"UPDATE dbo.{quote_ident(TRACKING_TABLE)} SET [RowCount] = 0 WHERE RelativePath = ?",
+            path,
+        )
+    return older
 
 
 def _sql_type_for_dtype(dtype) -> str:
@@ -315,5 +387,8 @@ def load_dataframe_into_table(
         create_table(conn, table_name, df)
 
     column_types = reconcile_schema(conn, table_name, df)
+    superseded = supersede_older_versions(conn, table_name, relative_path)
+    for path in superseded:
+        logger.info("%s | %s replaces older download %s (its rows removed)", table_name, relative_path, path)
     delete_rows_for_file(conn, table_name, relative_path)
     return insert_dataframe(conn, table_name, df, column_types, relative_path)

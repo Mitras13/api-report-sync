@@ -32,6 +32,7 @@ from db.sql_loader import (
     ensure_tracking_table,
     is_file_loaded,
     mark_file_loaded,
+    newer_version_loaded,
     load_dataframe_into_table,
 )
 
@@ -106,6 +107,15 @@ def _run(logger):
 
             if is_file_loaded(conn, relative_path):
                 skipped_files += 1
+                continue
+
+            # An older download of a range whose newer download is already in
+            # the table: never load it (it would double-count that range).
+            newer = newer_version_loaded(conn, table_name, relative_path)
+            if newer:
+                mark_file_loaded(conn, relative_path, table_name, 0)
+                skipped_files += 1
+                logger.info("%s | skipped %s (superseded by %s)", table_name, relative_path, newer)
                 continue
 
             try:
