@@ -4,6 +4,7 @@ tokens/*.txt
 tokens/tokens/
 logs/*.log*
 raw_data/
+_retired_raw/
 __pycache__/
 *.pyc
 .claude/
