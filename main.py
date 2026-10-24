@@ -24,6 +24,8 @@ from downloaders.CON_LST_HK import fetch as fetch_CON_LST_HK
 from downloaders.AGN_LST_54 import fetch as fetch_AGN_LST_54
 from downloaders.VOI_INC_HK import fetch as fetch_VOI_INC_HK
 from downloaders.SPK_54 import fetch as fetch_SPK_54
+from downloaders.EXT_HK import fetch as fetch_EXT_HK
+from downloaders.EXT_54 import fetch as fetch_EXT_54
 from downloaders.downloader_core import configure_logging, RAW_DATA_ROOT
 
 # ============================================================
@@ -100,6 +102,8 @@ WINDOW_DAYS = {
     "VP_HK": 7,
     "VP_54": 7,
     "VOI_INC_HK": 7,
+    "EXT_HK": 7,
+    "EXT_54": 7,
 }
 
 # محل نگهداری فایل‌های قدیمیِ جایگزین‌شده (پاک نمی‌شوند، فقط جابه‌جا)
@@ -144,6 +148,8 @@ DOWNLOADERS: Tuple[DownloaderSpec, ...] = (
     DownloaderSpec("AGN_LST_54", fetch_AGN_LST_54, False, "ListN", "54"),
     DownloaderSpec("VOI_INC_HK", fetch_VOI_INC_HK, False, "VoipTV", "54"),
     DownloaderSpec("SPK_54", fetch_SPK_54, False, "SPK", "54"),
+    DownloaderSpec("EXT_HK", fetch_EXT_HK, False, "EXT", "HK"),
+    DownloaderSpec("EXT_54", fetch_EXT_54, False, "EXT", "54"),
 )
 
 
