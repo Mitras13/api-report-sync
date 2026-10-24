@@ -12,7 +12,7 @@ import pyodbc
 
 sys.stdout.reconfigure(encoding="utf-8")
 HERE = Path(__file__).resolve().parent
-LOCK = Path(r"D:\MITRA\ربات های قدیمی\Robot_Downloader_sql\.load_raw_data_to_sql.lock")
+LOCK = HERE.parent / ".load_raw_data_to_sql.lock"
 JOBS = {
     "cleanup_redownloaded_files.sql":
         "۴۰ فایل تکراری (۱۹۸٬۳۰۴ ردیف) از SaleR_54، SaleR_HK، INV_SAL_54 و INV_SAL_HK",
