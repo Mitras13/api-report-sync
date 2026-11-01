@@ -15,6 +15,7 @@
 جمع دو شیت در خودِ اکسل با هم برابر نیست (شیت «مغایرت» اکسل)؛ این اسکریپت چیزی را
 اصلاح نمی‌کند، فقط عین منبع را لود می‌کند.
 
+فقط روزهای قبل از `TELEGRAM_FROM` آن شرکت لود می‌شوند؛ بعدش گزارش نهایی از تلگرام است.
 هر اجرا ردیف‌های اکسلیِ جدول آن شرکت را کامل جایگزین می‌کند (DELETE + INSERT در یک تراکنش)،
 چون اکسل تجمعی است و هر نسخه‌ی جدیدش کل سال را دارد. ردیف‌های تلگرام (`_SourceFile` با پیشوند
 `telegram:`) دست نمی‌خورند.
@@ -32,6 +33,7 @@ import jdatetime
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from ad_cost.telegram_loader import TELEGRAM_FROM  # noqa: E402
 from db.sql_loader import get_connection  # noqa: E402
 
 SQL_SERVER = "localhost"
@@ -108,7 +110,7 @@ CREATE TABLE dbo.[{t}] (
     [تاریخ] NVARCHAR(10) NOT NULL, [تاریخ میلادی] DATE NOT NULL, [ماه] NVARCHAR(7) NOT NULL,
     [سرپرست] NVARCHAR(100) NOT NULL, [مدیر] NVARCHAR(100) NULL,
     [بستر] NVARCHAR(100) NULL, [عاملیت] NVARCHAR(100) NULL,
-    [مبلغ] BIGINT NOT NULL, [مغایرت] NVARCHAR(50) NULL,
+    [مبلغ] BIGINT NOT NULL, [مغایرت] NVARCHAR(400) NULL,
     [ردیف اکسل] INT NOT NULL, [_SourceFile] NVARCHAR(400) NOT NULL, [_LoadedAt] DATETIME2(0) NOT NULL
 )"""
 PRD_DDL = """
@@ -154,6 +156,10 @@ def main() -> None:
     mgr = prd.dropna(subset=["مدیر"]).drop_duplicates(["تاریخ", "سرپرست"]).set_index(["تاریخ", "سرپرست"])["مدیر"]
     agn["مدیر"] = [mgr.get((d, s)) for d, s in zip(agn["تاریخ"], agn["سرپرست"])]
 
+    # از TELEGRAM_FROM به بعد گزارش نهایی از تلگرام است (ad_cost/telegram_loader.py).
+    cutoff = TELEGRAM_FROM[args.company]
+    agn, prd = agn[agn["تاریخ"] < cutoff], prd[prd["تاریخ"] < cutoff]
+    print(f"only dates before {cutoff} (telegram after)")
     print(f"products ({len(products)}): {', '.join(products)}")
     for name, df in [("agency", agn), ("product", prd)]:
         print(f"{name}: rows={len(df):,} sum={df['مبلغ'].sum():,} "

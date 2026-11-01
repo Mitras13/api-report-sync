@@ -179,7 +179,7 @@ def test_soltani_prefers_vat_amounts():
     assert m.ok, m.errors
     assert (m.company, m.date, m.supervisor, m.platform, m.total) == ("54", "1405/08/09", "سلطانی", "اینفلو", 50_710_000)
     assert m.agencies == {"ادوایس": 34_870_000, "ترند": 15_840_000}
-    assert m.products == {"دمنوش": 18_000_000, "دی دی کرم": 21_110_000, "قهوه لاغری": 6_600_000,
+    assert m.products == {"دمنوش": 18_000_000, "دی دی کرم": 21_110_000, "قهوه ساشه ای": 6_600_000,
                           "شامپو اسپیرولینا": 5_000_000}
 
 
@@ -218,9 +218,187 @@ def test_zandi():
                                    "قهوه لاغری": 46_805_000, "کرم دور چشم خاویار": 24_200_000}
 
 
-def test_pages_is_amirmahdi_and_malformed_amount_is_flagged():
+def test_pages_is_amirmahdi_and_odd_separator_is_read():
+    # «7.7000.000» = ۷٬۷۰۰٬۰۰۰ (کاربر: جداکننده‌ی نامرتب مغایرت نیست)؛ جمع محصولات هم با مجموع می‌خواند.
     m = parse_message(PAGES)
     assert (m.date, m.supervisor, m.platform, m.total) == ("1405/08/09", "امیرمهدی", "اینفلو", 27_500_000)
     assert nonzero(m.agencies) == {"مستقیم": 27_500_000}
-    assert not m.ok
-    assert any("7.7000.000" in e for e in m.errors)
+    assert m.ok, m.errors
+
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "ad_cost"
+
+
+def fixture(name):
+    sender, text = (FIXTURES / f"{name}.txt").read_text(encoding="utf-8").split("\n---\n", 1)
+    return parse_message(text, sender, 1405)
+
+
+def test_fakhari_word_date_and_company_from_supervisor():
+    m = fixture("fakhari_word_date_no_company")
+    assert m.ok, m.errors
+    assert (m.company, m.date, m.supervisor, m.platform, m.total) == ("54", "1405/08/08", "فخاری", "اینفلو", 644_138_000)
+    assert sum(m.products.values()) == 644_138_000
+
+
+def test_tashakori_amount_then_toman_line():
+    m = fixture("tashakori_toman_lines")
+    assert m.ok, m.errors
+    assert (m.date, m.supervisor, m.total) == ("1405/08/08", "تشکری", 511_060_000)
+    assert m.agencies["مستقیم"] == 61_820_000
+
+
+def test_eini_kol_is_total_and_trailing_influ():
+    m = fixture("eini_kol_total")
+    assert m.ok, m.errors
+    assert m.total == 498_630_000
+    assert m.agencies == {"ترند": 225_060_000, "ادوایس": 209_770_000, "ارتان": 15_400_000, "مستقیم": 48_400_000}
+
+
+def test_parvaz_supervisor_from_sender_and_products_only():
+    m = fixture("parvaz_sender_products_only")
+    assert m.ok, m.errors
+    assert (m.company, m.supervisor, m.platform, m.total) == ("54", "پرواز", "پیامک", 211_146_709)
+    assert m.agencies == {"پیامک": 211_146_709}
+    assert m.products["سفیدکننده دندان"] == 42_352_748
+
+
+def test_ranjbaran_dotted_date_and_latin_sender():
+    m = fixture("ranjbaran_dotted_date_latin_sender")
+    assert m.ok, m.errors
+    assert (m.company, m.date, m.supervisor, m.platform, m.total) == ("54", "1405/08/08", "رنجبران", "مدیا", 54_989_000)
+
+
+SATELLITE = """اعلام هزینه ماهواره 5040 - جلبک 
+
+9 آبان 
+
+221.118.012 میلیون تومان"""
+
+
+def test_satellite_single_amount_is_total_and_supervisor_from_latin_sender():
+    m = parse_message(SATELLITE, "Amirreza Eskandari", 1405)
+    assert m.ok, m.errors
+    assert (m.company, m.date, m.supervisor, m.platform, m.total) == ("54", "1405/08/09", "اسکندری", "ماهواره", 221_118_012)
+    assert m.agencies == {"ماهواره": 221_118_012}
+    assert m.products == {"جلبک": 221_118_012}
+
+
+SATELLITE_PERSIAN_SEPARATOR = """اعلام هزینه ۵۰۴۰ – ماهواره
+
+۱ آبان
+
+ ۲۳٬۳۲۱٬۰۴۰ میلیون تومان"""
+
+
+def test_satellite_persian_thousands_separator_and_product_is_jelbak():
+    m = parse_message(SATELLITE_PERSIAN_SEPARATOR, "Amirreza Eskandari", 1405)
+    assert m.ok, m.errors
+    assert (m.date, m.supervisor, m.total) == ("1405/08/01", "اسکندری", 23_321_040)
+    assert m.agencies == {"ماهواره": 23_321_040}
+    assert m.products == {"جلبک": 23_321_040}
+
+
+PARVAZ_WITH_OUTSIDE = """تاریخ. 1405/08/09
+پیامک (تفکیک محصول 
+
+جلبک:                           4,756,232
+
+جوانساز:                          77,703,207
+
+دمنوش:                       198,905,284
+
+دندان:                         41,172,251
+
+شامپو:                         33,938,964
+
+دی دی:                        38,574,102
+
+قهوه:                        9,233,458
+
+
+مجموع+10%:             
+
+404,283,498
+
+➖➖➖➖➖➖➖➖➖➖➖➖
+
+
+پیامک خارج از شرکت:
+
+تپسل:
+
+قهوه:            10,000,000
+دمنوش:        10,000,000
+
+
+
+مجموع+10%:             
+
+  20,000,000
+
+
+➖➖➖➖➖➖➖➖➖➖➖➖
+
+مجموع کل +10%:        
+424,283,498"""
+
+
+def test_parvaz_outside_sms_products_are_added_and_single_agency_gets_grand_total():
+    # تأیید کاربر: محصولات «خارج از شرکت» با قبلی جمع می‌شوند و کل مبلغ یک عاملیت «پیامک» است.
+    m = parse_message(PARVAZ_WITH_OUTSIDE, "آلما پرواز", 1405)
+    assert m.ok, m.errors
+    assert (m.supervisor, m.platform, m.total) == ("پرواز", "پیامک", 424_283_498)
+    assert m.agencies == {"پیامک": 424_283_498}
+    assert m.products["دمنوش"] == 208_905_284
+    assert m.products["قهوه ساشه ای"] == 19_233_458
+
+
+GOOGLE_OLD = """اعلام هزینه (تومان) همکده (گوگل ادز) به تفکیک تاریخ :
+ 1405/05/29
+ مجموع :                                              61,228,340
+ مجموع با ارزش افزوده:                                64,289,757
+ ———————————
+ خانواده              30,298,560
+ کلی                  3,770,260
+ تلفنی               16,373,335
+ خارج               272,960
+ فرزند              10,513,225"""
+
+
+def test_google_ads_vat_total_and_topics_scaled_to_vat():
+    # قاعده‌ی کاربر: همیشه عدد نهایی با ارزش افزوده
+    m = parse_message(GOOGLE_OLD, "حسین امیری", 1405)
+    assert m.ok, m.errors
+    assert (m.company, m.supervisor, m.platform, m.total) == ("HK", "گوگل ادز", "گوگل ادز", 64_289_757)
+    assert m.agencies == {"گوگل ادز": 64_289_757}
+    assert sum(m.products.values()) == 64_289_757
+    assert m.products["خارج"] == 272_960 * 64_289_757 // 61_228_340
+
+
+def test_google_ads_test_campaign_is_separate_supervisor():
+    text = GOOGLE_OLD.replace("همکده (گوگل ادز)", "گوگل ادز همکده (تست علی اصغر)")
+    m = parse_message(text, "حسین امیری", 1405)
+    assert (m.supervisor, m.platform) == ("گوگل ادز(تست)", "گوگل ادز(تست)")
+
+
+def test_product_with_raw_and_vat_amount_takes_vat():
+    text = """هزینه بلاگری 5040(سلطانی )
+ تاریخ1405/08/09
+ مجموع : 11.000.000 با ارزش افزوده
+دمنوش : 10.000.000
+دمنوش با ارزش افزوده: 11.000.000
+ادوایس با ارزش افزوده: 11.000.000"""
+    m = parse_message(text, None, 1405)
+    assert m.ok, m.errors
+    assert m.products == {"دمنوش": 11_000_000}
+
+
+def test_amount_separators_are_never_a_mismatch():
+    # کاربر: جداکننده‌ی سه‌رقمی نقطه، کاما، «/» یا هیچ است؛ «7.7000.000» همان ۷٬۷۰۰٬۰۰۰ است.
+    from ad_cost.telegram_parser import _parse_amount
+    errors = []
+    assert [_parse_amount(s, errors) for s in ("7.7000.000", "12.00.000", ".9.000.000", "117/000/000",
+                                               "23,321,040", "7700000")] == [
+        7700000, 12000000, 9000000, 117000000, 23321040, 7700000]
+    assert errors == []
