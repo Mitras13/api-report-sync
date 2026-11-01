@@ -204,12 +204,14 @@ Task Scheduler.
   به‌صورت پس‌زمینه اجرا شدند. بعد از اتمام، تسک شبانه‌ی معمولی خودش ادامه‌ی روزانه را
   می‌گیرد (چون دیگر فایل دارند، resume فقط از جلو ادامه می‌دهد، سریع).
 
-### هزینه‌ی تبلیغات (اکسل دستی + گروه تلگرام) → منتقل شد به `E:\Robot_Telegram` (۲۰۲۶-۱۱-۰۱)
+### هزینه‌ی تبلیغات (اکسل دستی + گروه تلگرام) → منتقل شد به `E:\AdCost-Bot` (۲۰۲۶-۱۱-۰۱)
 کد ربات هزینه‌ی تبلیغات (قبلاً `ad_cost/`، `scripts/load_ad_cost.py` و تست‌هایش در همین پروژه) به خواست کاربر
-به پروژه‌ی جدای **`E:\Robot_Telegram`** (ریپو خصوصی github.com/Mitras13/Robot_Telegram) منتقل و بازنویسی شد.
-همه‌ی قاعده‌ها، جدول‌ها (`ADV_AGN_54`، `ADV_PRD_54`، `ADV_AGN_HK`، `ADV_TOP_HK`، `ADV_TG_MSG`، `ADV_TG_STATE`
-در همین دیتابیس `Mitra_sarkhosh`) و تاریخچه در `E:\Robot_Telegram\CLAUDE.md` است. تسک ویندوز `AdCost_Telegram`
-(۱۰:۰۰ و ۱۴:۰۰) حالا از آن پوشه اجرا می‌شود. این پروژه دیگر کدی برای هزینه‌ی تبلیغات ندارد.
+به پروژه‌ی جدای **`E:\AdCost-Bot`** (ریپو خصوصی github.com/Mitras13/AdCost-Bot-، پکیج `adcost_bot`) منتقل و
+بازنویسی شد. جدول‌ها در همین دیتابیس `Mitra_sarkhosh` با اسم‌های واضح‌اند: `AdCost_5040_ByAgency`،
+`AdCost_5040_ByProduct`، `AdCost_Hamkadeh_ByAgency`، `AdCost_Hamkadeh_ByTopic`، `AdCost_TelegramMessages`،
+`AdCost_BotState`، و viewهای `AdCost_All_ByAgency` / `AdCost_All_ByProductOrTopic` (قبلاً `ADV_*`). قاعده‌ها و
+تاریخچه در `E:\AdCost-Bot\CLAUDE.md`. تسک ویندوز `AdCost_Telegram` (۱۰:۰۰ و ۱۴:۰۰) از آن پوشه اجرا می‌شود.
+این پروژه دیگر کدی برای هزینه‌ی تبلیغات ندارد.
 
 ### دانلودر SPK_54 (اضافه شده ۲۰۲۶-۰۹-۲۸)
 خلاصه‌ی سطح-کارشناس (نه رکورد خام تماس) از یک endpoint دیگه
