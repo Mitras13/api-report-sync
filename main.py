@@ -22,7 +22,7 @@ from downloaders.SaleR_54 import fetch as fetch_SaleR_54
 from downloaders.APT_LST_HK import fetch as fetch_APT_LST_HK
 from downloaders.CON_LST_HK import fetch as fetch_CON_LST_HK
 from downloaders.AGN_LST_54 import fetch as fetch_AGN_LST_54
-from downloaders.VOI_INC_HK import fetch as fetch_VOI_INC_HK
+from downloaders.VOI_INC_54 import fetch as fetch_VOI_INC_54
 from downloaders.SPK_54 import fetch as fetch_SPK_54
 from downloaders.EXT_HK import fetch as fetch_EXT_HK
 from downloaders.EXT_54 import fetch as fetch_EXT_54
@@ -39,11 +39,33 @@ from downloaders.downloader_core import configure_logging, RAW_DATA_ROOT
 LOCK_PATH = RAW_DATA_ROOT.parent / ".main_download.lock"
 
 
+def _lock_owner_alive() -> bool:
+    # اگر پروسه‌ی صاحب قفل مرده باشد (کرش، خاموشی سیستم)، قفل باطل است - وگرنه همه‌ی
+    # اجراهای بعدی بی‌سروصدا رد می‌شوند (دو بار اتفاق افتاد: ۲۰۲۶-۰۹-۲۲ و ۲۰۲۶-۱۰-۳۱).
+    # در هر حالت نامطمئن، قفل معتبر فرض می‌شود.
+    try:
+        pid = int(LOCK_PATH.read_text().strip())
+    except (OSError, ValueError):
+        return True
+    try:
+        import psutil
+    except ImportError:
+        return True
+    return psutil.pid_exists(pid)
+
+
 def acquire_lock() -> bool:
     try:
         fd = os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
-        return False
+        if _lock_owner_alive():
+            return False
+        logging.getLogger(__name__).warning("Removing stale lock file %s (owner process is gone)", LOCK_PATH)
+        release_lock()
+        try:
+            fd = os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return False
     with os.fdopen(fd, "w") as f:
         f.write(str(os.getpid()))
     return True
@@ -95,13 +117,13 @@ DEFAULT_START_TIME = "00:00:00"
 # برای این گزارش‌ها، هر اجرا N روز آخر را دوباره دانلود می‌کند و فایل‌های قدیمیِ همان روزها
 # (بعد از دانلود موفق) جایگزین می‌شوند، تا هر ردیف فقط یک‌بار و با آخرین وضعیتش بماند.
 WINDOW_DAYS = {
-    "INV_SAL_HK": 6,
-    "INV_SAL_54": 6,
+    "INV_SAL_HK": 7,
+    "INV_SAL_54": 7,
     "SaleR_HK": 6,
     "SaleR_54": 6,
     "VP_HK": 7,
     "VP_54": 7,
-    "VOI_INC_HK": 7,
+    "VOI_INC_54": 7,
     "EXT_HK": 7,
     "EXT_54": 7,
 }
@@ -146,7 +168,7 @@ DOWNLOADERS: Tuple[DownloaderSpec, ...] = (
     DownloaderSpec("APT_LST_HK", fetch_APT_LST_HK, False, "Nobat", "HK"),
     DownloaderSpec("CON_LST_HK", fetch_CON_LST_HK, False, "ListMoshaver", "HK"),
     DownloaderSpec("AGN_LST_54", fetch_AGN_LST_54, False, "ListN", "54"),
-    DownloaderSpec("VOI_INC_HK", fetch_VOI_INC_HK, False, "VoipTV", "54"),
+    DownloaderSpec("VOI_INC_54", fetch_VOI_INC_54, False, "VoipTV", "54"),
     DownloaderSpec("SPK_54", fetch_SPK_54, False, "SPK", "54"),
     DownloaderSpec("EXT_HK", fetch_EXT_HK, False, "EXT", "HK"),
     DownloaderSpec("EXT_54", fetch_EXT_54, False, "EXT", "54"),
@@ -253,9 +275,13 @@ def resolve_spec_range(
     window = WINDOW_DAYS.get(spec.label)
 
     if latest is not None:
-        spec_start = (latest + timedelta(days=1)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        # آخرین فایل اگر روز را تا ۲۳:۵۹:۵۹ نپوشانده (اجرای وسط روز)، همان روز
+        # دوباره کامل گرفته می‌شود - وگرنه بقیه‌ی آن روز هیچ‌وقت دانلود نمی‌شد.
+        if (latest.hour, latest.minute, latest.second) == (23, 59, 59):
+            resume_day = latest + timedelta(days=1)
+        else:
+            resume_day = latest
+        spec_start = resume_day.replace(hour=0, minute=0, second=0, microsecond=0)
         if window:
             window_start = (now - timedelta(days=window)).replace(
                 hour=0, minute=0, second=0, microsecond=0
@@ -391,11 +417,12 @@ def main():
                     result = _call_downloader(spec, period_start, period_end)
 
                     if ENABLE_SQL_LOAD:
-                        window = WINDOW_DAYS.get(spec.label)
-                        if window and period_start.date() >= (now - timedelta(days=window)).date():
-                            _retire_old_files_for_day(
-                                conn, spec, period_start.date(), _extract_save_path(result)
-                            )
+                        # هر بازه از ۰۰:۰۰ همان روز شروع می‌شود و تا ۲۳:۵۹:۵۹ (یا «الان» برای
+                        # امروز) می‌رود، پس فایل تازه همه‌ی فایل‌های قبلیِ آن روز (نسخه‌ی کهنه
+                        # یا نیم‌روزه) را پوشش می‌دهد و آن‌ها کنار گذاشته می‌شوند.
+                        _retire_old_files_for_day(
+                            conn, spec, period_start.date(), _extract_save_path(result)
+                        )
                         _load_result_into_sql(conn, spec, result)
 
                     total_success += 1

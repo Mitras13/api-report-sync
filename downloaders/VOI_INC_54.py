@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 URL = "https://api.5040.me/api/call/incoming-calls"
 METHOD = "GET"
-# توجه: اسم فایل VoipTV_HK است اما داده از api.5040.me و token54 می‌آید.
+# داده از api.5040.me و token54 (شرکت 5040). تا ۲۰۲۶-۱۰-۲۵ اسم این فایل VOI_INC_HK بود.
 COMPANY_CODE = "54"
 REPORT_CODE = "VoipTV"
 
