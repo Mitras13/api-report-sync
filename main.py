@@ -99,6 +99,7 @@ if ENABLE_SQL_LOAD:
         table_exists,
         load_dataframe_into_table,
     )
+    from db.inv_latest import refresh_all as refresh_inv_latest
 
 
 # ============================================================
@@ -450,6 +451,15 @@ def main():
                 finally:
                     if DELAY_BETWEEN_CALLS_SECONDS > 0:
                         time.sleep(DELAY_BETWEEN_CALLS_SECONDS)
+
+        if ENABLE_SQL_LOAD:
+            # جدول‌های آماده‌ی فاکتور برای دستیار داده (INV_Latest_*، Agg_Vosool_Daily، Org_Team) —
+            # فقط فاکتورهای فایل‌های تازه. خطایش دانلود را خراب نمی‌کند؛ اجرای بعدی دوباره سعی می‌کند.
+            try:
+                refresh_inv_latest(conn)
+            except Exception:
+                conn.rollback()
+                logger.exception("INV_Latest refresh FAILED (app keeps using raw INV_SAL)")
     finally:
         if conn is not None:
             conn.close()

@@ -35,6 +35,7 @@ from db.sql_loader import (
     newer_version_loaded,
     load_dataframe_into_table,
 )
+from db.inv_latest import refresh_all as refresh_inv_latest
 
 SQL_SERVER = "localhost"
 SQL_DATABASE = "Mitra_sarkhosh"
@@ -135,6 +136,13 @@ def _run(logger):
                 conn.rollback()
                 logger.exception("%s | FAILED to load %s", table_name, relative_path)
                 continue
+
+        # same as main.py: keep INV_Latest_* in step with the raw INV_SAL tables
+        try:
+            refresh_inv_latest(conn)
+        except Exception:
+            conn.rollback()
+            logger.exception("INV_Latest refresh FAILED (app keeps using raw INV_SAL)")
     finally:
         conn.close()
 
