@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مدار | مرکز کنترل داده</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<aside><a class="brand" href="/">◈ <strong>مدار</strong><small>مرکز کنترل داده</small></a><div class="nav-label">فضای کاری / MITRA</div><nav><button class="selected" data-view="overview">◫ <span>نمای کلی</span></button><button data-view="data">▦ <span>پوشش و ریپلیس</span></button><button data-view="database">▤ <span>دیتابیس و سلامت</span></button><button data-view="activity">↯ <span>فعالیت ربات</span></button><button data-view="tokens">⌘ <span>توکن‌ها</span></button><button data-view="settings">⚙ <span>تنظیمات</span></button></nav><div class="aside-foot"><span class="live-dot"></span> اتصال محلی و خصوصی<small>SQL Server · Robot Downloader</small></div></aside>
+<main><header><div class="breadcrumb">فضای کاری <span>/</span> مرکز کنترل <span>/</span> <b id="crumb">نمای کلی</b></div><div class="header-end"><span id="clock"></span><span class="avatar">م</span></div></header>
+<div class="page"><div class="page-head"><div><div class="eyebrow">DATA OPERATIONS / مرکز عملیات</div><h1 id="title">همهٔ داده‌ها، در یک نگاه.</h1><p id="subtitle">پوشش گزارش‌ها، سلامت دیتابیس و جریان به‌روزرسانی را دنبال کنید.</p></div><div class="actions"><button id="refresh">↻ به‌روزرسانی</button><button id="run" class="primary">▶ اجرای ربات</button></div></div>
+<div id="notice" role="status" hidden></div><div id="loading" class="card empty">در حال خواندن وضعیت واقعی دیتابیس و فایل‌ها…</div><div id="content"></div>
+<footer><span>مدار / پنل عملیات داده</span><span id="updated">—</span></footer></div></main>
+<dialog id="details"><div class="dialog-head"><h2 id="detail-title"></h2><button id="close-detail" aria-label="بستن">✕</button></div><div id="detail-body"></div></dialog>
+</body></html>
