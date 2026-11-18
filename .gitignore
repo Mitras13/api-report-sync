@@ -4,6 +4,7 @@ tokens/*.txt
 tokens/tokens/
 logs/*.log*
 raw_data/
+raw_data_csv/
 _retired_raw/
 __pycache__/
 *.pyc
@@ -11,3 +12,15 @@ __pycache__/
 .main_download.lock
 _*_tmp.py
 _*_tmp.txt
+.backfill_backward*.lock
+panel/settings.json
+panel/*.tmp
+panel/*.log
+
+# Project-local Graphify environment and generated graph
+.graphify-tool/
+graphify-out/
+
+# Local run output
+logs/*.csv
+debug.log

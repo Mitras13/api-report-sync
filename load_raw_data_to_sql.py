@@ -64,13 +64,18 @@ def release_lock():
         pass
 
 
+# پوشه‌هایی که جدولشان اسم دیگری دارد (همان DownloaderSpec.table_name در main.py).
+TABLE_FOR_FOLDER = {"NobatDate_HK": "APT_LST_HK"}
+
+
 def iter_parquet_files():
     """Yield (report_code, company_code, table_name, file_path) for every
     Parquet file under raw_data/<report_code>/<company_code>/, sorted so
     files are always loaded in the same order."""
     for report_dir in sorted(p for p in RAW_DATA_ROOT.iterdir() if p.is_dir()):
         for company_dir in sorted(p for p in report_dir.iterdir() if p.is_dir()):
-            table_name = f"{report_dir.name}_{company_dir.name}"
+            folder = f"{report_dir.name}_{company_dir.name}"
+            table_name = TABLE_FOR_FOLDER.get(folder, folder)
             for file_path in sorted(company_dir.glob("*.parquet")):
                 yield report_dir.name, company_dir.name, table_name, file_path
 

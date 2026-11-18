@@ -20,12 +20,19 @@ from downloaders.SCL_HK import fetch as fetch_SCL_HK
 from downloaders.SaleR_HK import fetch as fetch_SaleR_HK
 from downloaders.SaleR_54 import fetch as fetch_SaleR_54
 from downloaders.APT_LST_HK import fetch as fetch_APT_LST_HK
+from downloaders.APT_RSV_HK import fetch as fetch_APT_RSV_HK
 from downloaders.CON_LST_HK import fetch as fetch_CON_LST_HK
 from downloaders.AGN_LST_54 import fetch as fetch_AGN_LST_54
 from downloaders.VOI_INC_54 import fetch as fetch_VOI_INC_54
 from downloaders.SPK_54 import fetch as fetch_SPK_54
 from downloaders.EXT_HK import fetch as fetch_EXT_HK
 from downloaders.EXT_54 import fetch as fetch_EXT_54
+from downloaders.SPA_54 import fetch as fetch_SPA_54
+from downloaders.SPA_HK import fetch as fetch_SPA_HK
+from downloaders.ADL_HK import fetch as fetch_ADL_HK
+from downloaders.WTX_PT import fetch as fetch_WTX_PT
+from downloaders.DCU_PT import fetch as fetch_DCU_PT
+from downloaders.CALLS_HK import fetch as fetch_CALLS_HK
 from downloaders.downloader_core import configure_logging, RAW_DATA_ROOT
 
 # ============================================================
@@ -127,7 +134,30 @@ WINDOW_DAYS = {
     "VOI_INC_54": 7,
     "EXT_HK": 7,
     "EXT_54": 7,
+    # عددهای تبلیغات (وصولی/ثبتِ منتسب به عاملیت) تا چند روز بعد تغییر می‌کنند - به خواست کاربر ۱۰ روز.
+    "ADL_HK": 10,
+    # نوبت‌ها بر اساس تاریخ نوبت: هر شب ۱۰ روز آخر (تا دیروز) جایگزین می‌شود، چون وضعیت نوبت (انجام/لغو/تغییر)
+    # تا چند روز بعد از روز نوبت عوض می‌شود (کاربر ۱۴۰۵/۰۸/۱۷). بار اول ۳ ماه اخیر:
+    # scripts/backfill_backward.py APT_RSV_HK <سه ماه قبل>.
+    "APT_RSV_HK": 10,
+    "SPA_HK": 10,
+    "SPA_54": 10,
+    # پزشکت: داده‌ی یک روز تا دو روز بعد عوض می‌شود -> امروز، دیروز و پریروز هر بار کامل جایگزین (مشخصات کاربر).
+    "WTX_PT": 2,
+    "DCU_PT": 2,
+    # تماس‌های مشاوران همکده: ۳ روز آخر هر بار جایگزین (کاربر ۲۰۲۶-۱۱-۱۷، «فعلاً»).
+    "CALLS_HK": 3,
 }
+
+# دانلودرهایی که گذشته‌شان را اسکریپت جدای scripts/backfill_backward.py (از دیروز رو به
+# عقب) پر می‌کند: main.py اگر هنوز فایلی ندارند، به‌جای DEFAULT_START_DATE فقط از ابتدای
+# پنجره‌شان شروع می‌کند (وگرنه اولین اجرای شبانه کل ۱۴۰۴ را رو به جلو می‌گرفت).
+# WTX_PT/DCU_PT (پزشکت، ۲۰۲۶-۱۱-۱۶): گذشته تا ۱۴۰۲/۰۱/۰۱ و تا جایی که داده دارد (EMPTY_STOP_DAYS در بک‌فیل).
+# CALLS_HK: گذشته فقط تا ۱۴۰۵/۰۷/۰۱ (خواست کاربر؛ داده‌ی قدیمی‌تر لازم نیست).
+BACKFILLED_BACKWARD = {"SPA_HK", "SPA_54", "ADL_HK", "APT_RSV_HK", "WTX_PT", "DCU_PT", "CALLS_HK"}
+
+# دانلودرهایی که فقط روزهای تمام‌شده (تا دیروز ۲۳:۵۹:۵۹) را می‌گیرند، هر بار N روز آخر.
+COMPLETED_DAYS_ONLY = {"ADL_HK", "APT_RSV_HK"}
 
 # محل نگهداری فایل‌های قدیمیِ جایگزین‌شده (پاک نمی‌شوند، فقط جابه‌جا)
 RETIRED_ROOT = RAW_DATA_ROOT.parent / "_retired_raw"
@@ -156,6 +186,12 @@ class DownloaderSpec:
     simple_signature: bool
     report_code: str
     company_code: str
+    # جدول SQL؛ پیش‌فرض همان label. APT_RSV_HK پوشه‌ی جدا دارد ولی در جدول APT_LST_HK بار می‌شود.
+    table_name: Optional[str] = None
+
+    @property
+    def table(self) -> str:
+        return self.table_name or self.label
 
 
 DOWNLOADERS: Tuple[DownloaderSpec, ...] = (
@@ -167,12 +203,19 @@ DOWNLOADERS: Tuple[DownloaderSpec, ...] = (
     DownloaderSpec("SaleR_HK", fetch_SaleR_HK, False, "SaleR", "HK"),
     DownloaderSpec("SaleR_54", fetch_SaleR_54, False, "SaleR", "54"),
     DownloaderSpec("APT_LST_HK", fetch_APT_LST_HK, False, "Nobat", "HK"),
+    DownloaderSpec("APT_RSV_HK", fetch_APT_RSV_HK, False, "NobatDate", "HK", "APT_LST_HK"),
     DownloaderSpec("CON_LST_HK", fetch_CON_LST_HK, False, "ListMoshaver", "HK"),
     DownloaderSpec("AGN_LST_54", fetch_AGN_LST_54, False, "ListN", "54"),
     DownloaderSpec("VOI_INC_54", fetch_VOI_INC_54, False, "VoipTV", "54"),
     DownloaderSpec("SPK_54", fetch_SPK_54, False, "SPK", "54"),
     DownloaderSpec("EXT_HK", fetch_EXT_HK, False, "EXT", "HK"),
     DownloaderSpec("EXT_54", fetch_EXT_54, False, "EXT", "54"),
+    DownloaderSpec("ADL_HK", fetch_ADL_HK, False, "ADL", "HK"),
+    DownloaderSpec("SPA_HK", fetch_SPA_HK, False, "SPA", "HK"),
+    DownloaderSpec("SPA_54", fetch_SPA_54, False, "SPA", "54"),
+    DownloaderSpec("WTX_PT", fetch_WTX_PT, False, "WTX", "PT"),
+    DownloaderSpec("DCU_PT", fetch_DCU_PT, False, "DCU", "PT"),
+    DownloaderSpec("CALLS_HK", fetch_CALLS_HK, False, "CALLS", "HK"),
 )
 
 
@@ -272,8 +315,26 @@ def resolve_spec_range(
     """Each downloader resumes from the day after its own latest saved
     file, not from a global date shared by every report - the reports
     are at very different points in their historical backfill."""
+    if spec.label in COMPLETED_DAYS_ONLY:
+        # Exactly N completed days, ending yesterday; never request today's rows.
+        end = (now - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=0)
+        latest = latest_downloaded_period_end(spec.report_code, spec.company_code)
+        window = max(1, WINDOW_DAYS.get(spec.label, 10))
+        start = (now - timedelta(days=window)).replace(hour=0, minute=0, second=0, microsecond=0)
+        if latest is not None:
+            resume = latest.replace(hour=0, minute=0, second=0, microsecond=0)
+            if (latest.hour, latest.minute, latest.second) == (23, 59, 59):
+                resume += timedelta(days=1)
+            start = min(start, resume)
+        start = max(start, default_start)
+        return (start, end) if start <= end else None
     latest = latest_downloaded_period_end(spec.report_code, spec.company_code)
     window = WINDOW_DAYS.get(spec.label)
+
+    if latest is None and window and spec.label in BACKFILLED_BACKWARD:
+        latest = (now - timedelta(days=window + 1)).replace(
+            hour=23, minute=59, second=59, microsecond=0
+        )
 
     if latest is not None:
         # آخرین فایل اگر روز را تا ۲۳:۵۹:۵۹ نپوشانده (اجرای وسط روز)، همان روز
@@ -329,8 +390,8 @@ def _retire_old_files_for_day(
             continue
 
         relative_path = str(file_path.relative_to(RAW_DATA_ROOT)).replace("\\", "/")
-        if table_exists(conn, spec.label):
-            delete_rows_for_file(conn, spec.label, relative_path)
+        if table_exists(conn, spec.table):
+            delete_rows_for_file(conn, spec.table, relative_path)
         unmark_file_loaded(conn, relative_path)
 
         target = RETIRED_ROOT / spec.report_code / spec.company_code / file_path.name
@@ -354,11 +415,18 @@ def _load_result_into_sql(conn, spec: DownloaderSpec, result) -> None:
         return
 
     df = pd.read_parquet(save_path)
-    row_count = load_dataframe_into_table(conn, spec.label, df, relative_path)
-    mark_file_loaded(conn, relative_path, spec.label, row_count)
+    row_count = load_dataframe_into_table(conn, spec.table, df, relative_path)
+    mark_file_loaded(conn, relative_path, spec.table, row_count)
 
 
 def main():
+
+    # Settings are read for each run, including scheduled runs outside the panel.
+    from panel_settings import read_settings, validate_settings
+    global DELAY_BETWEEN_CALLS_SECONDS
+    settings = validate_settings(read_settings(), {s.label for s in DOWNLOADERS})
+    WINDOW_DAYS.update(settings['windows'])
+    DELAY_BETWEEN_CALLS_SECONDS = settings['delay']
 
     configure_logging()
     logger = logging.getLogger(__name__)
@@ -387,6 +455,10 @@ def main():
 
     try:
         for spec in DOWNLOADERS:
+
+            if spec.label in settings['disabled']:
+                logger.info('%s | disabled in operator panel', spec.label)
+                continue
 
             spec_range = resolve_spec_range(spec, default_start, now)
             if spec_range is None:

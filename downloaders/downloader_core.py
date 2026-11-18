@@ -25,6 +25,8 @@ TOKEN_FILES = {
 # regular per-company TOKEN_FILES above - see downloaders/SPK_54.py.
 SMART_PANEL_TOKEN_FILES = {
     "54": PROJECT_ROOT / "tokens" / "tokenSmartPanel54.txt",
+    # همکده: کاربر دیگری در پنل (user 178) - downloaders/SPA_HK.py
+    "HK": PROJECT_ROOT / "tokens" / "tokenSmartPanelHK.txt",
 }
 
 logger = logging.getLogger(__name__)
@@ -440,6 +442,9 @@ def save_response_to_csv(response, save_path):
         response.close()
 
 
+NO_STATS_MESSAGE = "آماری وجود ندارد"
+
+
 def smart_panel_json_to_dataframe(payload: dict) -> pd.DataFrame:
     """
     Smart panel endpoints (5040-product.5040.me) wrap their table in
@@ -447,7 +452,15 @@ def smart_panel_json_to_dataframe(payload: dict) -> pd.DataFrame:
     of returning CSV directly. An empty "data" is only a legitimate
     "no activity" result when status is exactly True; otherwise it's a real
     failure response and must not silently become a header-only DataFrame.
+
+    A bare JSON string "آماری وجود ندارد" (no stats for that period - e.g.
+    calculate-ads on 1404/10/19) is also a legitimate empty result.
     """
+    if isinstance(payload, str):
+        if payload.strip() == NO_STATS_MESSAGE:
+            return pd.DataFrame()
+        raise InvalidContentError(f"Smart panel returned a message instead of a table: {payload[:200]!r}")
+
     data = payload.get("data", [])
     columns = payload.get("column")
 
@@ -466,7 +479,13 @@ def smart_panel_json_to_dataframe(payload: dict) -> pd.DataFrame:
 
 
 def fetch_smart_panel_json(
-    url, company_code, report_code, period_start, period_end, build_json_body
+    url,
+    company_code,
+    report_code,
+    period_start,
+    period_end,
+    build_json_body,
+    transform_df=None,
 ):
     """
     Smart panel equivalent of fetch_generic: synchronous POST, auth via
@@ -477,6 +496,9 @@ def fetch_smart_panel_json(
 
     build_json_body(period_start, period_end) must return the full POST
     body dict (including any fixed output-generator id).
+
+    transform_df(df, period_start, period_end), if given, reshapes the
+    DataFrame before it is saved (e.g. dropping a total row).
     """
     token = load_smart_panel_token(company_code)
     json_body = build_json_body(period_start, period_end)
@@ -497,6 +519,8 @@ def fetch_smart_panel_json(
         response.close()
 
     df = smart_panel_json_to_dataframe(payload)
+    if transform_df is not None:
+        df = transform_df(df, period_start, period_end)
 
     download_time = now_jalali()
     filename = build_raw_filename(
