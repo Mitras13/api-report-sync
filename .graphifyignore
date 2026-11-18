@@ -1,0 +1,14 @@
+﻿.graphify-tool/
+graphify-out/
+tokens/
+raw_data/
+_retired_raw/
+logs/
+db/
+.env
+panel/settings.json
+*.log
+*.lock
+.agents/
+.codex/
+.claude/
