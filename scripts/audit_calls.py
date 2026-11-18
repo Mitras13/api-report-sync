@@ -7,7 +7,7 @@
 برای روز مشکوک: دوباره از API می‌گیرد؛ اگر ردیف بیشتری آمد جایگزین می‌شود، وگرنه «پاسخ API ثابت است».
 خروجی: logs/calls_audit.csv و خلاصه در کنسول.
 
-    python scripts/audit_calls.py [1405/07/01]
+    python scripts/audit_calls.py [1405/01/01]
 """
 import csv
 import io
@@ -199,5 +199,5 @@ def main_run(first_day, logger):
 
 if __name__ == "__main__":
     configure_logging()
-    first = jdatetime.datetime.strptime(sys.argv[1] if len(sys.argv) > 1 else "1405/07/01", "%Y/%m/%d").date()
+    first = jdatetime.datetime.strptime(sys.argv[1] if len(sys.argv) > 1 else "1405/01/01", "%Y/%m/%d").date()
     main_run(first, logging.getLogger("audit_calls"))
